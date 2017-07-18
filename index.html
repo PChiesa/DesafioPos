@@ -1,12 +1,15 @@
 <html>
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="stylesheet" type="text/css" href="./styles/style.css" />
   <title>Desafio POS</title>
 </head>
+
 <body>
-  
+
   <div id="page-1">
     <h4>Page 1</h4>
     <p>This is the page 1</p>
@@ -17,16 +20,22 @@
     <p>Property 1: <span>this should be replaced according to the props</span></p>
     <p>Property 2: <span>this should be replaced according to the props</span></p>
   </div>
-  
+
   <div id="page-3">
     <h4>Page 3</h4>
     <p>This is the 3rd page</p>
   </div>
 
   <ul class="bottom-navigation">
-    <li>Go to page 1</li>
-    <li>Go to page 2</li>
-    <li>Go to page 3</li>
+    <li class="active">
+      <a href="#">
+      <span>1</span>
+      Go to page 1</li>
+      </a>
+      <li>
+        <span>2</span> Go to page 2</li>
+      <li>
+        <span>3</span> Go to page 3</li>
   </ul>
 
   <script src="./api/component.js"></script>
@@ -35,5 +44,14 @@
   <script src="./pages/page2.js"></script>
   <script src="./pages/page3.js"></script>
   <script src="./routes/routes.js"></script>
+  <script>
+    Page1.unmount();
+    Page2.unmount();
+    Page3.unmount();
+
+    Page1.create();
+    Page1.mount(document.body);
+  </script>
 </body>
+
 </html>

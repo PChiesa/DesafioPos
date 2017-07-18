@@ -53,7 +53,7 @@
  * @param {object} component The component to use to create the instance
  */
 let ComponentInstance = function (component) {
-
+    this.component = Object.assign({}, component);
 }
 
 /**
@@ -62,7 +62,8 @@ let ComponentInstance = function (component) {
  *                       this function just updates the values
  */
 ComponentInstance.prototype.create = function (props) {
-  
+    this.component = Object.assign(this.component, props);
+    this.component.onCreate();
 }
 
 /**
@@ -70,14 +71,16 @@ ComponentInstance.prototype.create = function (props) {
  * @param {HTMLElement} element The element used parent
  */
 ComponentInstance.prototype.mount = function (element) {
-  
+    element.appendChild(this.component.element);
+    this.component.onMount();
 }
 
 /**
  * Remove the ComponentInstance.element from the DOM
  */
 ComponentInstance.prototype.unmount = function () {
-  
+    document.getElementById(this.component.element.id).remove();
+    this.component.onUnmount();
 }
 
 /**
@@ -85,5 +88,6 @@ ComponentInstance.prototype.unmount = function () {
  * @param {object} props The props to be updated
  */
 ComponentInstance.prototype.update = function (props) {
-
+    this.component = Object.assign(this.component, props);
+    this.component.onUpdate();
 }
