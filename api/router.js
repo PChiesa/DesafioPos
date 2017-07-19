@@ -42,14 +42,54 @@
  * @param {object[]} routes The routes to use
  */
 let Router = function (routes) {
+    this.routes = routes;
 
+    let regex = new RegExp(/\?(\w+)/g);    
+
+    this.routes.forEach((route) => {
+
+        route.params = {};
+        route.matchUrl = "";
+
+        let params = route.path.match(regex);
+
+        if (params) {
+            let paramPositions = route.path.split("/");
+
+            params.forEach((p) => {
+                let paramIndex = paramPositions.indexOf(p);
+                route.params[paramIndex] = p;
+            });
+
+            paramPositions.forEach((p, index) => {
+                if (index > 0) {
+                    if (route.params[index])
+                        route.matchUrl += "\\/\\w+";
+                    else
+                        route.matchUrl += `\/${p}`;
+                }
+            });
+        }
+        else
+            route.matchUrl = route.path;
+
+        route.matchUrl = `^${route.matchUrl}$`;
+
+        console.log(route.matchUrl);
+    });
 }
 
 /**
  * Initiate the router. It must unmount the pages on the DOM and keep just the active page mounted, according to the current url
  */
 Router.prototype.init = function () {
+    let url = location.pathname;
 
+    this.routes.forEach((route) => {
+        let regex = new RegExp(route.matchUrl);
+        if (!regex.test(url))
+            route.component.unmount();
+    });
 }
 
 /**
@@ -58,6 +98,8 @@ Router.prototype.init = function () {
  */
 Router.prototype.replace = function (url) {
 
+
+    history.replaceState()
 }
 
 /**
@@ -65,7 +107,7 @@ Router.prototype.replace = function (url) {
  * @param {string} url The url to use
  */
 Router.prototype.push = function (url) {
-
+    history.pushState()
 }
 
 /**
@@ -73,5 +115,7 @@ Router.prototype.push = function (url) {
  * @param {number} index The number of pages to go. A positive number will go forward on the history and a negative one will go backwards
  */
 Router.prototype.go = function (index) {
+    if (index !== 0)
+        history.go(index);
 
 }

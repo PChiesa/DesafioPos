@@ -14,4 +14,7 @@ let routes = [
     path: '/page3',
     component: Page3
   },
-]
+];
+
+let router = new Router(routes);
+router.init();
