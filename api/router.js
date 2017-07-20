@@ -44,7 +44,7 @@
 let Router = function (routes) {
     this.routes = routes;
 
-    let regex = new RegExp(/\?(\w+)/g);    
+    let regex = new RegExp(/\?(\w+)/g);
 
     this.routes.forEach((route) => {
 
@@ -83,12 +83,30 @@ let Router = function (routes) {
  * Initiate the router. It must unmount the pages on the DOM and keep just the active page mounted, according to the current url
  */
 Router.prototype.init = function () {
-    let url = location.pathname;
+
+    let url;
+    if (new RegExp(/(\#\/?)/).test(location.href))
+        url = location.href.split("#")[1] || "/";
+    else {
+        url = "/";
+        location.href += "#";
+    }
 
     this.routes.forEach((route) => {
         let regex = new RegExp(route.matchUrl);
         if (!regex.test(url))
             route.component.unmount();
+        else
+            this.currentRoute = route;
+    });
+
+    let navigation = document.getElementById("navigation");
+    navigation.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (e.target.nodeName === 'A') {
+            let targetUrl = e.target.pathname;
+            this.push(targetUrl);
+        }
     });
 }
 
@@ -107,7 +125,19 @@ Router.prototype.replace = function (url) {
  * @param {string} url The url to use
  */
 Router.prototype.push = function (url) {
-    history.pushState()
+
+    let targetRoute;
+
+    if (typeof (url) === "string")
+        targetRoute = this.routes.find((route) => route.path === url);
+    else
+        targetRoute = this.routes.find((route) => route.path === url.path || route.name === url.name);
+
+    if (this.currentRoute.name !== targetRoute.name) {
+        this.currentRoute.component.unmount();
+        targetRoute.component.mount(document.body);
+        history.pushState(targetRoute.name, null, "#" + targetRoute.path);
+    }
 }
 
 /**
@@ -117,5 +147,4 @@ Router.prototype.push = function (url) {
 Router.prototype.go = function (index) {
     if (index !== 0)
         history.go(index);
-
 }
