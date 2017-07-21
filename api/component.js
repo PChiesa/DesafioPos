@@ -54,6 +54,17 @@
  */
 let ComponentInstance = function (component) {
     this.component = Object.assign({}, component);
+
+    this.updatePropsIfTheyExist = () => {
+        if (this.component.props) {
+            Object.keys(this.component.props).forEach((propKey, index) => {
+                let propValue = this.component.props[propKey];
+                let element = document.querySelector(`[data-bind=${propKey}]`);
+                element.innerHTML = propValue;
+            });
+        }
+    }
+
 }
 
 /**
@@ -62,7 +73,10 @@ let ComponentInstance = function (component) {
  *                       this function just updates the values
  */
 ComponentInstance.prototype.create = function (props) {
-    this.component = Object.assign(this.component, props);
+    this.component.props = Object.assign(this.component.props || {}, props);
+
+    this.updatePropsIfTheyExist();
+
     this.component.onCreate();
 }
 
@@ -88,6 +102,9 @@ ComponentInstance.prototype.unmount = function () {
  * @param {object} props The props to be updated
  */
 ComponentInstance.prototype.update = function (props) {
-    this.component = Object.assign(this.component, props);
+    this.component.props = Object.assign(this.component.props || {}, props);
+
+    this.updatePropsIfTheyExist();
+
     this.component.onUpdate();
 }

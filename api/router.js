@@ -44,14 +44,14 @@
 let Router = function (routes) {
     this.routes = routes;
 
-    let regex = new RegExp(/\?(\w+)/g);
+    let paramsRegex = new RegExp(/\?(\w+)/g);
 
     this.routes.forEach((route) => {
 
         route.params = {};
         route.matchUrl = "";
 
-        let params = route.path.match(regex);
+        let params = route.path.match(paramsRegex);
 
         if (params) {
             let paramPositions = route.path.split("/");
@@ -84,6 +84,8 @@ let Router = function (routes) {
  */
 Router.prototype.init = function () {
 
+    this.currentRoute;
+
     let url;
     if (new RegExp(/(\#\/?)/).test(location.href))
         url = location.href.split("#")[1] || "/";
@@ -95,18 +97,33 @@ Router.prototype.init = function () {
     this.routes.forEach((route) => {
         let regex = new RegExp(route.matchUrl);
         if (!regex.test(url))
-            route.component.unmount();
-        else
-            this.currentRoute = route;
+            route.component.unmount();            
     });
+
+    this.push(url);
 
     let navigation = document.getElementById("navigation");
     navigation.addEventListener("click", (e) => {
         e.preventDefault();
-        if (e.target.nodeName === 'A') {
-            let targetUrl = e.target.pathname;
-            this.push(targetUrl);
-        }
+
+        let link;
+
+        if (e.target.nodeName === 'A')
+            link = e.target;
+        else if (e.target.parentNode.nodeName === 'A')
+            link = e.target.parentNode;
+
+        this.push(link.pathname);
+    });
+
+    window.addEventListener("popstate", (event) => {
+        if (!event) return;
+        if (!event.state) return;
+
+        this.currentRoute.component.unmount();
+        let targetRoute = this.routes.find((route) => route.name === event.state.name);
+        targetRoute.component.mount(document.body);
+        this.currentRoute = targetRoute;
     });
 }
 
@@ -127,16 +144,54 @@ Router.prototype.replace = function (url) {
 Router.prototype.push = function (url) {
 
     let targetRoute;
+    let props = {};
 
-    if (typeof (url) === "string")
-        targetRoute = this.routes.find((route) => route.path === url);
-    else
-        targetRoute = this.routes.find((route) => route.path === url.path || route.name === url.name);
+    if (typeof (url) === "string") {
+        targetRoute = this.routes.find((route) => {
+            let regex = new RegExp(route.matchUrl);
+            return regex.test(url);
+        });
 
-    if (this.currentRoute.name !== targetRoute.name) {
-        this.currentRoute.component.unmount();
-        targetRoute.component.mount(document.body);
-        history.pushState(targetRoute.name, null, "#" + targetRoute.path);
+        let paramsOrder = Object.keys(targetRoute.params);
+
+        if (paramsOrder.length) {
+            let urlProps = url.split("/");
+            paramsOrder.forEach((param, index) => {
+                let propName = targetRoute.params[paramsOrder[index]].replace("?", "");
+                props[propName] = urlProps[param];
+            });
+        }
+
+        pushStateIfNotSameRoute.call(this, url);
+    }
+    else {
+        targetRoute = this.routes.find((route) => {
+            let regex = new RegExp(route.matchUrl);
+            return regex.test(url.path) || regex.test(url.name);
+        });
+
+        pushStateIfNotSameRoute.call(this, targetRoute.path);
+    }
+
+    /**
+     * Push the state to the history if the target route is different than the current route     
+     * @param {string} urlToBePushed The url that will be pushed to the navigation bar
+     */
+    function pushStateIfNotSameRoute(urlToBePushed) {
+        if (!this.currentRoute) {
+            targetRoute.component.create(props);
+            history.pushState({ name: targetRoute.name }, null, "#" + urlToBePushed);
+            this.currentRoute = targetRoute;            
+        }
+        else if (this.currentRoute.name !== targetRoute.name) {
+            this.currentRoute.component.unmount();
+
+            targetRoute.component.mount(document.body);
+            targetRoute.component.create(props);
+
+            this.currentRoute = targetRoute;
+            history.pushState({ name: targetRoute.name }, null, "#" + urlToBePushed);
+        }
     }
 }
 
