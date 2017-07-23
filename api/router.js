@@ -48,12 +48,13 @@ let Router = function (routes) {
 
     this.routes.forEach((route) => {
 
-        route.params = {};
         route.matchUrl = "";
 
         let params = route.path.match(paramsRegex);
 
         if (params) {
+
+            route.params = {};
             let paramPositions = route.path.split("/");
 
             params.forEach((p) => {
@@ -97,7 +98,7 @@ Router.prototype.init = function () {
     this.routes.forEach((route) => {
         let regex = new RegExp(route.matchUrl);
         if (!regex.test(url))
-            route.component.unmount();            
+            route.component.unmount();
     });
 
     this.push(url);
@@ -106,23 +107,55 @@ Router.prototype.init = function () {
     navigation.addEventListener("click", (e) => {
         e.preventDefault();
 
-        let link;
+        let activeNavigation = navigation.getElementsByClassName("active")[0];
+        activeNavigation.className = null;
 
-        if (e.target.nodeName === 'A')
-            link = e.target;
-        else if (e.target.parentNode.nodeName === 'A')
-            link = e.target.parentNode;
+        let link = e.target.closest("a");
+
+        let newActiveNavigation = e.target.closest("li");
+        newActiveNavigation.className = "active";
 
         this.push(link.pathname);
     });
 
-    window.addEventListener("popstate", (event) => {
-        if (!event) return;
-        if (!event.state) return;
+    window.addEventListener("hashchange", (event) => {
+        let currentUrl = location.hash.replace("#", "");
+        let currentRoute = this.getRouteByUrl(currentUrl);
 
-        this.currentRoute.component.unmount();
-        let targetRoute = this.routes.find((route) => route.name === event.state.name);
-        targetRoute.component.mount(document.body);
+        let activeNavigation = navigation.getElementsByClassName("active")[0];
+        activeNavigation.className = null;
+
+        let links = navigation.querySelectorAll("a");
+
+        for (let index = 0; index < links.length; index++) {
+            let a = links[index];
+            let regx = new RegExp(currentRoute.matchUrl);
+            if (regx.test(a.pathname)) {
+                let newActiveNavigation = a.closest("li");
+                newActiveNavigation.className = "active";
+                break;
+            }
+        }
+    });
+
+    window.addEventListener("popstate", (event) => {
+
+        let currentUrl = location.hash.replace("#", "");
+
+        targetRoute = this.getRouteByUrl(currentUrl);
+
+        let props = {};
+
+        if (this.routeHasParams(targetRoute))
+            props = this.extractParamsFromUrl(targetRoute, currentUrl);
+
+        if (this.currentRoute.name !== targetRoute.name) {
+            this.currentRoute.component.unmount();
+            targetRoute.component.mount(document.body);
+        }
+
+        targetRoute.component.create(props);
+
         this.currentRoute = targetRoute;
     });
 }
@@ -132,9 +165,7 @@ Router.prototype.init = function () {
  * @param {string} url The url to use
  */
 Router.prototype.replace = function (url) {
-
-
-    history.replaceState()
+    history.replaceState(null, null, "#" + url);
 }
 
 /**
@@ -144,54 +175,38 @@ Router.prototype.replace = function (url) {
 Router.prototype.push = function (url) {
 
     let targetRoute;
+
+    if (typeof (url) === "string")
+        targetRoute = this.getRouteByUrl(url);
+    else
+        targetRoute = this.getRouteByPathOrName(url);
+
     let props = {};
 
-    if (typeof (url) === "string") {
-        targetRoute = this.routes.find((route) => {
-            let regex = new RegExp(route.matchUrl);
-            return regex.test(url);
-        });
+    if (this.routeHasParams(targetRoute))
+        props = this.extractParamsFromUrl(targetRoute, url);
 
-        let paramsOrder = Object.keys(targetRoute.params);
+    pushStateIfNotSameRoute.call(this, url, props);
 
-        if (paramsOrder.length) {
-            let urlProps = url.split("/");
-            paramsOrder.forEach((param, index) => {
-                let propName = targetRoute.params[paramsOrder[index]].replace("?", "");
-                props[propName] = urlProps[param];
-            });
-        }
-
-        pushStateIfNotSameRoute.call(this, url);
-    }
-    else {
-        targetRoute = this.routes.find((route) => {
-            let regex = new RegExp(route.matchUrl);
-            return regex.test(url.path) || regex.test(url.name);
-        });
-
-        pushStateIfNotSameRoute.call(this, targetRoute.path);
-    }
 
     /**
      * Push the state to the history if the target route is different than the current route     
      * @param {string} urlToBePushed The url that will be pushed to the navigation bar
+     * @param {object} urlParams The parameters inside the url
      */
-    function pushStateIfNotSameRoute(urlToBePushed) {
-        if (!this.currentRoute) {
-            targetRoute.component.create(props);
-            history.pushState({ name: targetRoute.name }, null, "#" + urlToBePushed);
-            this.currentRoute = targetRoute;            
-        }
-        else if (this.currentRoute.name !== targetRoute.name) {
-            this.currentRoute.component.unmount();
+    function pushStateIfNotSameRoute(urlToBePushed, urlParams) {
 
-            targetRoute.component.mount(document.body);
-            targetRoute.component.create(props);
+        if (this.currentRoute)
+            if (this.currentRoute.name !== targetRoute.name) {
+                this.currentRoute.component.unmount();
+                targetRoute.component.mount(document.body);
+            }
+            else
+                return;
 
-            this.currentRoute = targetRoute;
-            history.pushState({ name: targetRoute.name }, null, "#" + urlToBePushed);
-        }
+        targetRoute.component.create(urlParams);
+        history.pushState({ name: targetRoute.name }, null, "#" + urlToBePushed);
+        this.currentRoute = targetRoute;
     }
 }
 
@@ -200,6 +215,80 @@ Router.prototype.push = function (url) {
  * @param {number} index The number of pages to go. A positive number will go forward on the history and a negative one will go backwards
  */
 Router.prototype.go = function (index) {
-    if (index !== 0)
+    if (index)
         history.go(index);
+}
+
+/**
+ * Get a route based on a url
+ * @param {string} url Url to be matched with one of the routes
+ * @returns {object} Route match or index route if no route is found
+ */
+Router.prototype.getRouteByUrl = function (url) {
+
+    let foundRoute = this.routes.find((route) => {
+        return new RegExp(route.matchUrl).test(url);
+    });
+
+    if (foundRoute)
+        return foundRoute;
+
+    let rootRoute = this.getRootRoute();
+    this.replace(rootRoute.path);
+    return rootRoute;
+}
+
+/**
+ * Get a route based on a path or a name
+ * @param {object} routeObj The object with the name or path
+ * @return {object} Route match or index route if no route is found
+ */
+Router.prototype.getRouteByPathOrName = function (routeObj) {
+
+    let foundRoute = this.routes.find((route) => {
+        return route.name === routeObj.name || new RegExp(route.matchUrl).test(routeObj.path)
+    });
+
+    if (foundRoute)
+        return foundRoute;
+
+    let rootRoute = this.getRootRoute();
+    this.replace(rootRoute.path);
+    return rootRoute;
+}
+
+/**
+ * Gets the route with the path "/"
+ * @returns {object} The root route
+ */
+Router.prototype.getRootRoute = function () {
+    return this.routes.find((route) => route.path === "/");
+}
+
+/**
+ * Checks if a route has parameters in its url
+ * @param {object} route Route to be checked
+ * @returns {boolean}
+ */
+Router.prototype.routeHasParams = function (route) {
+    return Boolean(route.params);
+}
+
+/**
+ * Extract the parameters from the currentUrl
+ * @param {object} route Route with params
+ * @param {string} currentUrl Url with parameters to be extracted
+ * @returns {object} Object with the parameters
+ */
+Router.prototype.extractParamsFromUrl = function (route, currentUrl) {
+    let props = {};
+    let urlParams = currentUrl.split("/");
+    let routeParams = Object.keys(route.params);
+
+    routeParams.forEach((param, index) => {
+        let propName = route.params[routeParams[index]].replace("?", "");
+        props[propName] = urlParams[param];
+    });
+
+    return props;
 }
